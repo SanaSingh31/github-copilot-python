@@ -39,6 +39,41 @@ def fill_board(board):
                 return False
     return True
 
+
+def find_empty_cell(board):
+    for row in range(SIZE):
+        for col in range(SIZE):
+            if board[row][col] == EMPTY:
+                return row, col
+    return None
+
+
+def count_solutions(board, limit=2):
+    working_board = deep_copy(board)
+
+    def backtrack():
+        empty_cell = find_empty_cell(working_board)
+        if empty_cell is None:
+            return 1
+
+        row, col = empty_cell
+        solution_count = 0
+        for candidate in range(1, SIZE + 1):
+            if not is_safe(working_board, row, col, candidate):
+                continue
+
+            working_board[row][col] = candidate
+            solution_count += backtrack()
+            working_board[row][col] = EMPTY
+
+            if solution_count >= limit:
+                return solution_count
+
+        return solution_count
+
+    return backtrack()
+
+
 def remove_cells(board, clues):
     attempts = SIZE * SIZE - clues
     while attempts > 0:
@@ -47,6 +82,7 @@ def remove_cells(board, clues):
         if board[row][col] != EMPTY:
             board[row][col] = EMPTY
             attempts -= 1
+
 
 def generate_puzzle(clues=35):
     board = create_empty_board()
