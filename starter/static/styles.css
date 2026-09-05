@@ -116,21 +116,6 @@ button:hover {
   min-height: 24px;
 }
 
-#score-form {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin: 16px auto 24px;
-}
-
-#player-name {
-  box-sizing: border-box;
-  font-size: 16px;
-  max-width: 220px;
-  padding: 8px;
-}
-
 .error-message {
   color: #d32f2f;
 }

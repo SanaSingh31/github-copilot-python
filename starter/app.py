@@ -51,5 +51,30 @@ def check_solution():
     return jsonify({"incorrect": incorrect})
 
 
+@app.route("/hint", methods=["POST"])
+def get_hint():
+    puzzle = CURRENT.get("puzzle")
+    solution = CURRENT.get("solution")
+
+    if puzzle is None or solution is None:
+        return jsonify({"error": "No game in progress"}), 400
+
+    for row in range(sudoku_logic.SIZE):
+        for col in range(sudoku_logic.SIZE):
+            if puzzle[row][col] == sudoku_logic.EMPTY:
+                value = solution[row][col]
+
+                # Mark the hinted cell as filled in the current puzzle
+                puzzle[row][col] = value
+
+                return jsonify({
+                    "row": row,
+                    "col": col,
+                    "value": value,
+                })
+
+    return jsonify({"message": "There are no empty cells left"})
+
+
 if __name__ == "__main__":
     app.run(debug=True)
