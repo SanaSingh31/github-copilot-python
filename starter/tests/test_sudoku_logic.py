@@ -78,18 +78,44 @@ def test_generate_puzzle_returns_board_dimensions_and_valid_solution_structure()
     assert_valid_complete_board(solution)
 
 
-def test_generate_puzzle_has_expected_number_of_clues():
-    for clues in (17, 25, 35, 45):
-        puzzle, _ = sudoku_logic.generate_puzzle(clues=clues)
+def test_generate_puzzle_has_expected_number_of_clues_for_each_difficulty():
+    expected_clues = {"Easy": 45, "Medium": 35, "Hard": 28}
+
+    for difficulty, clues in expected_clues.items():
+        puzzle, _ = sudoku_logic.generate_puzzle(difficulty=difficulty)
         filled_cells = sum(cell != EMPTY for row in puzzle for cell in row)
         assert filled_cells == clues
 
 
 def test_generate_puzzle_produces_valid_puzzle_with_zeroes_for_blanks():
-    puzzle, _ = sudoku_logic.generate_puzzle(clues=30)
+    puzzle, _ = sudoku_logic.generate_puzzle(difficulty="Medium")
 
     assert any(cell == EMPTY for row in puzzle for cell in row)
     assert all(0 <= value <= 9 for row in puzzle for value in row)
+
+
+def test_generate_puzzle_has_exactly_one_solution_for_each_difficulty():
+    for difficulty in ("Easy", "Medium", "Hard"):
+        puzzle, _ = sudoku_logic.generate_puzzle(difficulty=difficulty)
+
+        assert sudoku_logic.count_solutions(puzzle, limit=2) == 1
+
+
+def test_generate_puzzle_preserves_legacy_medium_clue_call():
+    puzzle, _ = sudoku_logic.generate_puzzle(clues=35)
+
+    assert sum(cell != EMPTY for row in puzzle for cell in row) == 35
+
+
+@pytest.mark.parametrize("difficulty", ["easy", "Extreme"])
+def test_generate_puzzle_rejects_invalid_difficulty(difficulty):
+    with pytest.raises(ValueError):
+        sudoku_logic.generate_puzzle(difficulty=difficulty)
+
+
+def test_generate_puzzle_rejects_unsupported_clue_count():
+    with pytest.raises(ValueError):
+        sudoku_logic.generate_puzzle(clues=30)
 
 
 def test_count_solutions_returns_one_for_solved_board():

@@ -84,10 +84,36 @@ def remove_cells(board, clues):
             attempts -= 1
 
 
-def generate_puzzle(clues=35):
+def _remove_cells_preserving_uniqueness(board, clues):
+    cells = [(row, col) for row in range(SIZE) for col in range(SIZE)]
+    random.shuffle(cells)
+
+    for row, col in cells:
+        if sum(cell != EMPTY for current_row in board for cell in current_row) <= clues:
+            break
+
+        value = board[row][col]
+        board[row][col] = EMPTY
+        if count_solutions(board, limit=2) != 1:
+            board[row][col] = value
+
+    filled_cells = sum(cell != EMPTY for row in board for cell in row)
+    if filled_cells != clues:
+        raise RuntimeError("Unable to generate a unique puzzle at this difficulty")
+
+
+def generate_puzzle(clues=35, difficulty=None):
+    clue_counts = {"Easy": 45, "Medium": 35, "Hard": 28}
+    if difficulty is not None:
+        if difficulty not in clue_counts:
+            raise ValueError("difficulty must be Easy, Medium, or Hard")
+        clues = clue_counts[difficulty]
+    elif clues not in clue_counts.values():
+        raise ValueError("clues must be 45, 35, or 28")
+
     board = create_empty_board()
     fill_board(board)
     solution = deep_copy(board)
-    remove_cells(board, clues)
+    _remove_cells_preserving_uniqueness(board, clues)
     puzzle = deep_copy(board)
     return puzzle, solution
