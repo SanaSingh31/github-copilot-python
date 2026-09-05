@@ -1,7 +1,11 @@
-from flask import Flask, render_template, jsonify, request
-import sudoku_logic
+"""Flask application routes for the Sudoku game."""
+
+from flask import Flask, jsonify, render_template, request
+
+from services.game_service import check_board, create_game, find_hint
 
 app = Flask(__name__)
+
 
 # Store the current puzzle, solution, and cells that have already received hints.
 CURRENT = {
@@ -13,19 +17,43 @@ CURRENT = {
 
 @app.route("/")
 def index():
+    """Render the Sudoku game page."""
     return render_template("index.html")
 
 
 @app.route("/new")
 def new_game():
+    """Create and return a new Sudoku puzzle."""
     difficulty = request.args.get("difficulty", "Medium")
 
+    # Keep compatibility with the existing /new?clues=35 test and API.
+    clues = request.args.get("clues")
+
+    if clues is not None:
+        try:
+            clue_count = int(clues)
+        except ValueError:
+            return jsonify({"error": "clues must be a valid number"}), 400
+
+        clue_to_difficulty = {
+            45: "Easy",
+            35: "Medium",
+            28: "Hard",
+        }
+
+        if clue_count not in clue_to_difficulty:
+            return jsonify({
+                "error": "clues must be 45, 35, or 28"
+            }), 400
+
+        difficulty = clue_to_difficulty[clue_count]
+
     try:
-        puzzle, solution = sudoku_logic.generate_puzzle(
-            difficulty=difficulty
-        )
+        puzzle, solution = create_game(difficulty)
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
+    except RuntimeError as error:
+        return jsonify({"error": str(error)}), 500
 
     # Store the new game.
     CURRENT["puzzle"] = puzzle
@@ -36,12 +64,12 @@ def new_game():
 
     return jsonify({
         "puzzle": puzzle,
-        "solution": solution,
     })
 
 
 @app.route("/check", methods=["POST"])
 def check_solution():
+    """Check the player's board against the current solution."""
     data = request.get_json()
 
     if not data or "board" not in data:
@@ -53,12 +81,10 @@ def check_solution():
     if solution is None:
         return jsonify({"error": "No game in progress"}), 400
 
-    incorrect = []
-
-    for row in range(sudoku_logic.SIZE):
-        for col in range(sudoku_logic.SIZE):
-            if board[row][col] != solution[row][col]:
-                incorrect.append([row, col])
+    try:
+        incorrect = check_board(board, solution)
+    except (IndexError, TypeError):
+        return jsonify({"error": "Invalid board data"}), 400
 
     return jsonify({
         "incorrect": incorrect
@@ -67,38 +93,21 @@ def check_solution():
 
 @app.route("/hint", methods=["POST"])
 def get_hint():
+    """Provide the next available hint for the current puzzle."""
     puzzle = CURRENT.get("puzzle")
     solution = CURRENT.get("solution")
 
     if puzzle is None or solution is None:
         return jsonify({"error": "No game in progress"}), 400
 
-    # Make sure the hinted set exists.
     hinted = CURRENT.setdefault("hinted", set())
 
-    # Find the first empty cell that has not already been hinted.
-    for row in range(sudoku_logic.SIZE):
-        for col in range(sudoku_logic.SIZE):
+    try:
+        result = find_hint(puzzle, solution, hinted)
+    except (IndexError, TypeError):
+        return jsonify({"error": "Unable to provide a hint"}), 500
 
-            if puzzle[row][col] != sudoku_logic.EMPTY:
-                continue
-
-            if (row, col) in hinted:
-                continue
-
-            # Remember that this cell has already been given as a hint.
-            hinted.add((row, col))
-
-            return jsonify({
-                "row": row,
-                "col": col,
-                "value": solution[row][col],
-            })
-
-    # All empty cells have already received hints.
-    return jsonify({
-        "message": "There are no more hints available"
-    })
+    return jsonify(result)
 
 
 if __name__ == "__main__":

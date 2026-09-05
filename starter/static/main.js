@@ -34,10 +34,16 @@ function stopTimer() {
 
 
 function updateTimer() {
+  const timer = document.getElementById("timer");
+
+  if (!timer) {
+    return;
+  }
+
   const minutes = Math.floor(secondsElapsed / 60);
   const seconds = secondsElapsed % 60;
 
-  document.getElementById("timer").innerText =
+  timer.innerText =
     String(minutes).padStart(2, "0") +
     ":" +
     String(seconds).padStart(2, "0");
@@ -61,7 +67,9 @@ function formatTime(totalSeconds) {
 // ==============================
 
 function getDifficulty() {
-  return document.getElementById("difficulty").value;
+  const difficulty = document.getElementById("difficulty");
+
+  return difficulty ? difficulty.value : "Medium";
 }
 
 
@@ -72,14 +80,19 @@ function getDifficulty() {
 function createBoardElement() {
   const boardDiv = document.getElementById("sudoku-board");
 
+  if (!boardDiv) {
+    console.error("Sudoku board element was not found.");
+    return;
+  }
+
   boardDiv.innerHTML = "";
 
-  for (let i = 0; i < SIZE; i++) {
+  for (let row = 0; row < SIZE; row++) {
     const rowDiv = document.createElement("div");
 
     rowDiv.className = "sudoku-row";
 
-    for (let j = 0; j < SIZE; j++) {
+    for (let col = 0; col < SIZE; col++) {
       const input = document.createElement("input");
 
       input.type = "text";
@@ -88,14 +101,28 @@ function createBoardElement() {
 
       input.className = "sudoku-cell";
 
-      input.dataset.row = i;
-      input.dataset.col = j;
+      input.dataset.row = row;
+      input.dataset.col = col;
 
-      if ((Math.floor(i / 3) + Math.floor(j / 3)) % 2 === 0) {
-        input.classList.add("shaded-block");
-      }
+      /*
+       * Alternate the nine 3x3 Sudoku blocks.
+       *
+       * Pattern:
+       * SHADE | PLAIN | SHADE
+       * PLAIN | SHADE | PLAIN
+       * SHADE | PLAIN | SHADE
+       *
+       * This is based on the block coordinates rather
+       * than the individual cell coordinates.
+       */
+      const boxRow = Math.floor(row / 3);
+      const boxCol = Math.floor(col / 3);
 
-      input.addEventListener("input", handleInput);
+      const isShaded = (boxRow + boxCol) % 2 === 0;
+
+      input.classList.add(
+        isShaded ? "box-shade" : "box-plain"
+      );
 
       rowDiv.appendChild(input);
     }
@@ -106,12 +133,26 @@ function createBoardElement() {
 
 
 // ==============================
-// USER INPUT / CONFLICT CHECK
+// EVENT DELEGATION
 // ==============================
 
-function handleInput(event) {
+function handleBoardInput(event) {
   const input = event.target;
 
+  if (!input.classList.contains("sudoku-cell")) {
+    return;
+  }
+
+  handleInput(input);
+}
+
+
+function handleInput(input) {
+  if (input.disabled) {
+    return;
+  }
+
+  // Allow only numbers 1-9.
   input.value = input.value.replace(/[^1-9]/g, "");
 
   input.classList.remove("conflict-error");
@@ -145,12 +186,17 @@ function hasConflict(row, col, value) {
       continue;
     }
 
-    // Same row or column
-    if (otherRow === row || otherCol === col) {
+    // Check same row.
+    if (otherRow === row) {
       return true;
     }
 
-    // Same 3x3 block
+    // Check same column.
+    if (otherCol === col) {
+      return true;
+    }
+
+    // Check same 3x3 block.
     const sameBlock =
       Math.floor(otherRow / 3) === Math.floor(row / 3) &&
       Math.floor(otherCol / 3) === Math.floor(col / 3);
@@ -174,14 +220,23 @@ function renderPuzzle(puz, sol) {
 
   createBoardElement();
 
-  const inputs = document.querySelectorAll(".sudoku-cell");
+  const boardDiv = document.getElementById("sudoku-board");
 
-  for (let i = 0; i < SIZE; i++) {
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
+  if (!boardDiv) {
+    return;
+  }
 
-      const input = inputs[idx];
-      const value = puzzle[i][j];
+  // Event delegation:
+  // One input listener handles all Sudoku cells.
+  boardDiv.addEventListener("input", handleBoardInput);
+
+  const inputs = boardDiv.querySelectorAll(".sudoku-cell");
+
+  for (let row = 0; row < SIZE; row++) {
+    for (let col = 0; col < SIZE; col++) {
+      const index = row * SIZE + col;
+      const input = inputs[index];
+      const value = puzzle[row][col];
 
       input.classList.remove(
         "prefilled",
@@ -231,7 +286,7 @@ async function newGame() {
     }
 
     puzzle = data.puzzle;
-    solution = data.solution;
+    solution = data.solution || [];
 
     renderPuzzle(data.puzzle, data.solution);
 
@@ -242,7 +297,7 @@ async function newGame() {
     showMessage("", false);
 
   } catch (error) {
-    console.error(error);
+    console.error("New game error:", error);
 
     showMessage(
       "Unable to connect to the server.",
@@ -263,17 +318,25 @@ async function checkSolution() {
 
   const inputs = document.querySelectorAll(".sudoku-cell");
 
+  if (inputs.length !== SIZE * SIZE) {
+    showMessage(
+      "The Sudoku board is not ready.",
+      true
+    );
+
+    return;
+  }
+
   const board = [];
 
-  for (let i = 0; i < SIZE; i++) {
-    board[i] = [];
+  for (let row = 0; row < SIZE; row++) {
+    board[row] = [];
 
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
+    for (let col = 0; col < SIZE; col++) {
+      const index = row * SIZE + col;
+      const value = inputs[index].value;
 
-      const value = inputs[idx].value;
-
-      board[i][j] = value ? Number(value) : 0;
+      board[row][col] = value ? Number(value) : 0;
     }
   }
 
@@ -308,8 +371,8 @@ async function checkSolution() {
       )
     );
 
-    for (let idx = 0; idx < inputs.length; idx++) {
-      const input = inputs[idx];
+    for (let index = 0; index < inputs.length; index++) {
+      const input = inputs[index];
 
       if (input.disabled) {
         continue;
@@ -317,19 +380,22 @@ async function checkSolution() {
 
       input.classList.remove("incorrect");
 
-      if (incorrect.has(idx)) {
+      if (incorrect.has(index)) {
         input.classList.add("incorrect");
       }
     }
 
-    // Correct solution
     if (incorrect.size === 0) {
       gameCompleted = true;
 
       stopTimer();
 
       showMessage(
-        "Congratulations! You solved it!",
+        "Congratulations! You solved the puzzle in " +
+        formatTime(secondsElapsed) +
+        " using " +
+        hintsUsed +
+        " hint(s)!",
         false
       );
 
@@ -337,13 +403,13 @@ async function checkSolution() {
 
     } else {
       showMessage(
-        "Some cells are incorrect.",
+        "Some cells are incorrect. Please check the highlighted cells.",
         true
       );
     }
 
   } catch (error) {
-    console.error(error);
+    console.error("Check solution error:", error);
 
     showMessage(
       "Unable to check the solution.",
@@ -358,6 +424,10 @@ async function checkSolution() {
 // ==============================
 
 async function hint() {
+  if (gameCompleted) {
+    return;
+  }
+
   try {
     const response = await fetch("/hint", {
       method: "POST"
@@ -408,6 +478,11 @@ async function hint() {
 
     input.disabled = true;
 
+    /*
+     * Keep the 3x3 block class and add the hint class.
+     * CSS will preserve the block shading while visually
+     * distinguishing the hinted cell.
+     */
     input.classList.add("hint-cell");
 
     input.classList.remove(
@@ -423,7 +498,7 @@ async function hint() {
     );
 
   } catch (error) {
-    console.error(error);
+    console.error("Hint error:", error);
 
     showMessage(
       "Unable to connect to the server.",
@@ -489,9 +564,21 @@ function saveScore(event) {
     return;
   }
 
-  const scores = JSON.parse(
-    localStorage.getItem("sudokuLeaderboard") || "[]"
-  );
+  let scores = [];
+
+  try {
+    scores = JSON.parse(
+      localStorage.getItem("sudokuLeaderboard") || "[]"
+    );
+
+    if (!Array.isArray(scores)) {
+      scores = [];
+    }
+
+  } catch (error) {
+    console.error("Unable to read leaderboard:", error);
+    scores = [];
+  }
 
   scores.push({
     name: name,
@@ -500,10 +587,10 @@ function saveScore(event) {
     hints: hintsUsed
   });
 
-  // Fastest times first
+  // Fastest times first.
   scores.sort((a, b) => a.time - b.time);
 
-  // Keep only top 10
+  // Keep only the top 10 scores.
   const topScores = scores.slice(0, 10);
 
   localStorage.setItem(
@@ -536,9 +623,21 @@ function renderLeaderboard() {
 
   body.innerHTML = "";
 
-  const scores = JSON.parse(
-    localStorage.getItem("sudokuLeaderboard") || "[]"
-  );
+  let scores = [];
+
+  try {
+    scores = JSON.parse(
+      localStorage.getItem("sudokuLeaderboard") || "[]"
+    );
+
+    if (!Array.isArray(scores)) {
+      scores = [];
+    }
+
+  } catch (error) {
+    console.error("Unable to read leaderboard:", error);
+    scores = [];
+  }
 
   scores.forEach((score, index) => {
     const row = document.createElement("tr");
@@ -622,39 +721,51 @@ window.addEventListener(
   "DOMContentLoaded",
   () => {
 
-    document
-      .getElementById("new-game")
-      .addEventListener(
+    const newGameButton =
+      document.getElementById("new-game");
+
+    if (newGameButton) {
+      newGameButton.addEventListener(
         "click",
         newGame
       );
+    }
 
 
-    document
-      .getElementById("check-solution")
-      .addEventListener(
+    const checkButton =
+      document.getElementById("check-solution");
+
+    if (checkButton) {
+      checkButton.addEventListener(
         "click",
         checkSolution
       );
+    }
 
 
-    document
-      .getElementById("hint")
-      .addEventListener(
+    const hintButton =
+      document.getElementById("hint");
+
+    if (hintButton) {
+      hintButton.addEventListener(
         "click",
         hint
       );
+    }
 
 
-    document
-      .getElementById("dark-mode")
-      .addEventListener(
+    const darkModeButton =
+      document.getElementById("dark-mode");
+
+    if (darkModeButton) {
+      darkModeButton.addEventListener(
         "click",
         toggleDarkMode
       );
+    }
 
 
-    // Name form submit
+    // Name form submit.
     const nameForm =
       document.getElementById("name-form");
 
