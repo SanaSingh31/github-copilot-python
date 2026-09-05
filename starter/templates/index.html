@@ -1,18 +1,62 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sudoku Game</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
+
 <body>
   <h1>Sudoku Game</h1>
+
+  <div class="top-controls">
+    <label for="difficulty">Difficulty:</label>
+    <select id="difficulty">
+      <option value="Easy">Easy</option>
+      <option value="Medium" selected>Medium</option>
+      <option value="Hard">Hard</option>
+    </select>
+
+    <button id="dark-mode">Dark Mode</button>
+
+    <span id="timer">00:00</span>
+  </div>
+
   <div id="sudoku-board"></div>
+
   <div class="controls">
     <button id="new-game">New Game</button>
+    <button id="hint">Hint</button>
     <button id="check-solution">Check Solution</button>
-    <span id="message"></span>
   </div>
+
+  <div id="message"></div>
+
+  <form id="score-form" hidden>
+    <label for="player-name">Enter your name:</label>
+    <input id="player-name" name="player-name" type="text" maxlength="30" required>
+    <button type="submit">Save Score</button>
+  </form>
+
+  <section id="leaderboard-section">
+    <h2>Top 10 Leaderboard</h2>
+
+    <table id="leaderboard">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Name</th>
+          <th>Time</th>
+          <th>Level</th>
+          <th>Hints</th>
+        </tr>
+      </thead>
+
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </section>
+
   <script src="/static/main.js"></script>
 </body>
 </html>
