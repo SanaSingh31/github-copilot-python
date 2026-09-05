@@ -3,10 +3,11 @@ import sudoku_logic
 
 app = Flask(__name__)
 
-# Keep the current puzzle and its solution in memory.
+# Store the current puzzle, solution, and cells that have already received hints.
 CURRENT = {
     "puzzle": None,
     "solution": None,
+    "hinted": set(),
 }
 
 
@@ -26,16 +27,27 @@ def new_game():
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
 
+    # Store the new game.
     CURRENT["puzzle"] = puzzle
     CURRENT["solution"] = solution
 
-    return jsonify({"puzzle": puzzle})
+    # Reset the hinted cells for the new puzzle.
+    CURRENT["hinted"] = set()
+
+    return jsonify({
+        "puzzle": puzzle,
+        "solution": solution,
+    })
 
 
 @app.route("/check", methods=["POST"])
 def check_solution():
     data = request.get_json()
-    board = data.get("board")
+
+    if not data or "board" not in data:
+        return jsonify({"error": "Invalid board data"}), 400
+
+    board = data["board"]
     solution = CURRENT.get("solution")
 
     if solution is None:
@@ -48,7 +60,9 @@ def check_solution():
             if board[row][col] != solution[row][col]:
                 incorrect.append([row, col])
 
-    return jsonify({"incorrect": incorrect})
+    return jsonify({
+        "incorrect": incorrect
+    })
 
 
 @app.route("/hint", methods=["POST"])
@@ -59,21 +73,32 @@ def get_hint():
     if puzzle is None or solution is None:
         return jsonify({"error": "No game in progress"}), 400
 
+    # Make sure the hinted set exists.
+    hinted = CURRENT.setdefault("hinted", set())
+
+    # Find the first empty cell that has not already been hinted.
     for row in range(sudoku_logic.SIZE):
         for col in range(sudoku_logic.SIZE):
-            if puzzle[row][col] == sudoku_logic.EMPTY:
-                value = solution[row][col]
 
-                # Mark the hinted cell as filled in the current puzzle
-                puzzle[row][col] = value
+            if puzzle[row][col] != sudoku_logic.EMPTY:
+                continue
 
-                return jsonify({
-                    "row": row,
-                    "col": col,
-                    "value": value,
-                })
+            if (row, col) in hinted:
+                continue
 
-    return jsonify({"message": "There are no empty cells left"})
+            # Remember that this cell has already been given as a hint.
+            hinted.add((row, col))
+
+            return jsonify({
+                "row": row,
+                "col": col,
+                "value": solution[row][col],
+            })
+
+    # All empty cells have already received hints.
+    return jsonify({
+        "message": "There are no more hints available"
+    })
 
 
 if __name__ == "__main__":
